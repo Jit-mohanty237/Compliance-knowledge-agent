@@ -1,0 +1,35 @@
+// Configured backend API base URL
+const API_BASE_URL = 'http://localhost:8000/api';
+
+/**
+ * Sends a message to the FastAPI compliance agent backend.
+ * 
+ * @param {string} message - The compliance question.
+ * @param {string|null} sessionId - The current active session ID.
+ * @returns {Promise<{response: string, session_id: string}>}
+ */
+export async function sendChatMessage(message, sessionId = null) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message,
+        session_id: sessionId,
+      }),
+    });
+
+    if (!response.ok) {
+      // Extract detailed error from FastAPI if available
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Server responded with status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('API Service Error:', error);
+    throw error;
+  }
+}
