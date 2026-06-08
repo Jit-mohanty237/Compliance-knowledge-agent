@@ -8,6 +8,7 @@ export default function Home() {
   const [currentSessionId, setCurrentSessionId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   // Load sessions from localStorage on mount
   useEffect(() => {
@@ -47,6 +48,7 @@ export default function Home() {
       id: newSessionId,
       title: 'New Consultation',
       messages: [],
+      createdAt: new Date().toISOString(),
     };
     
     setSessions((prev) => [newSession, ...prev]);
@@ -80,6 +82,8 @@ export default function Home() {
             ...session,
             title,
             messages: [...session.messages, userMessage],
+            // Ensure we have a creation date
+            createdAt: session.createdAt || new Date().toISOString(),
           };
         }
         return session;
@@ -133,33 +137,47 @@ export default function Home() {
     setError(null);
   };
 
-  // Callback: Clear/Reset a specific session's history
-  const handleClearHistory = (id) => {
-    setSessions((prevSessions) =>
-      prevSessions.map((session) => {
-        if (session.id === id) {
-          return {
-            ...session,
-            title: 'New Consultation',
-            messages: [],
-          };
-        }
-        return session;
-      })
-    );
-    setError(null);
+  // Callback: Delete a session entirely from history
+  const handleDeleteSession = (id, e) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    
+    const updated = sessions.filter((s) => s.id !== id);
+    setSessions(updated);
+    
+    if (currentSessionId === id) {
+      if (updated.length > 0) {
+        setCurrentSessionId(updated[0].id);
+      } else {
+        // If empty, generate a new active session
+        const newSessionId = crypto.randomUUID();
+        const newSession = {
+          id: newSessionId,
+          title: 'New Consultation',
+          messages: [],
+          createdAt: new Date().toISOString(),
+        };
+        setSessions([newSession]);
+        setCurrentSessionId(newSessionId);
+      }
+    }
   };
 
   return (
-    <div className="flex w-screen h-screen overflow-hidden bg-[#080b11] text-slate-100">
+    <div className="flex w-screen h-screen overflow-hidden bg-background text-text-primary">
       {/* Navigation Sidebar */}
-      <Sidebar
-        sessions={sessions}
-        currentSessionId={currentSessionId}
-        onSelectSession={handleSelectSession}
-        onNewChat={startNewSession}
-        onClearHistory={handleClearHistory}
-      />
+      {isSidebarOpen && (
+        <Sidebar
+          sessions={sessions}
+          currentSessionId={currentSessionId}
+          onSelectSession={handleSelectSession}
+          onNewChat={startNewSession}
+          onDeleteSession={handleDeleteSession}
+          onToggleSidebar={() => setIsSidebarOpen(false)}
+        />
+      )}
       
       {/* Conversation Thread */}
       <ChatWindow
@@ -167,6 +185,9 @@ export default function Home() {
         onSendMessage={handleSendMessage}
         isLoading={isLoading}
         error={error}
+        isSidebarOpen={isSidebarOpen}
+        onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+        onNewChat={startNewSession}
       />
     </div>
   );

@@ -7,7 +7,18 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Deep premium compliancy branding
+        background: 'var(--background)',
+        card: 'var(--card)',
+        brand: {
+          DEFAULT: 'var(--brand)',
+          hover: 'var(--brand-hover)',
+          text: 'var(--brand-text)',
+        },
+        'text-primary': 'var(--text-primary)',
+        'text-secondary': 'var(--text-secondary)',
+        border: 'var(--border)',
+        
+        // Keep compliance colors in case they're used by subcomponents
         compliance: {
           50: '#f0f7ff',
           100: '#e0effe',
@@ -21,6 +32,14 @@ export default {
           900: '#0c3f6b',
           950: '#082847',
         }
+      },
+      boxShadow: {
+        soft: 'var(--shadow-soft)',
+        elevated: 'var(--shadow-elevated)',
+      },
+      borderRadius: {
+        bubble: 'var(--radius-bubble)',
+        chip: 'var(--radius-chip)',
       }
     },
   },
