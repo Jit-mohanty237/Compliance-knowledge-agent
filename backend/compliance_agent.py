@@ -1,3 +1,15 @@
+from services.intent_classifier import IntentClassifier
+from vector_db.retriever import (
+    search,
+    search_compliance,
+    search_hr,
+    build_context,
+    KNOWLEDGE_BASES
+)
+from crewai.llm import LLM
+from crewai import Agent, Task, Crew, Process
+import os
+from dotenv import load_dotenv
 import sys
 from pathlib import Path
 import time
@@ -9,20 +21,6 @@ if str(project_root) not in sys.path:
     sys.path.append(str(project_root))
 
 # pyrefly: ignore [missing-import]
-from dotenv import load_dotenv
-import os
-
-from crewai import Agent, Task, Crew, Process
-from crewai.llm import LLM
-
-from backend.vector_db.retriever import (
-    search,
-    search_compliance,
-    search_hr,
-    build_context,
-    KNOWLEDGE_BASES
-)
-from backend.services.intent_classifier import IntentClassifier
 
 
 # ==========================================================
@@ -48,6 +46,7 @@ gemini_fallback_llm = LLM(
     api_key=GEMINI_API_KEY
 )
 
+
 def execute_with_retry_and_fallback(fn, max_retries=3):
     """
     Executes a model function (crew.kickoff or llm.call) with retries 
@@ -58,12 +57,14 @@ def execute_with_retry_and_fallback(fn, max_retries=3):
             return fn()
         except Exception as e:
             err_msg = str(e)
-            is_temporary = any(code in err_msg for code in ["503", "500", "429", "UNAVAILABLE", "ResourceExhausted", "high demand", "overloaded"])
-            
+            is_temporary = any(code in err_msg for code in [
+                               "503", "500", "429", "UNAVAILABLE", "ResourceExhausted", "high demand", "overloaded"])
+
             if is_temporary and attempt < max_retries - 1:
                 # Exponential backoff with jitter
                 sleep_time = (2 ** attempt) + random.uniform(0, 1)
-                print(f"[WARNING] Temporary LLM error encountered: {err_msg}. Retrying in {sleep_time:.2f}s (Attempt {attempt+1}/{max_retries})...")
+                print(
+                    f"[WARNING] Temporary LLM error encountered: {err_msg}. Retrying in {sleep_time:.2f}s (Attempt {attempt+1}/{max_retries})...")
                 time.sleep(sleep_time)
             else:
                 raise e
@@ -133,12 +134,12 @@ compliance_agent = Agent(
 def run_compliance_query(query: str, chat_history: list = None) -> dict:
     """
     Execute a query using Multi-KB RAG.
-    
+
     Why this exists:
         Routes queries based on intent (COMPLIANCE, HR, or GENERAL) to 
         prevent search pollution. Integrates fallback LLM generation 
         for general small talk or missing vector database records.
-        
+
     How it works:
         1. Runs IntentClassifier on query.
         2. Retrieves from either latam_compliance or hr_playbook.
@@ -148,10 +149,10 @@ def run_compliance_query(query: str, chat_history: list = None) -> dict:
     """
     # 1. INTENT CLASSIFICATION
     intent = IntentClassifier.classify(query)
-    
+
     collection_name = "GENERAL_LLM"
     results = []
-    
+
     # 2. RETRIEVE FROM CORRESPONDING KNOWLEDGE BASE
     if intent == "COMPLIANCE":
         collection_name = KNOWLEDGE_BASES["COMPLIANCE"]
@@ -160,7 +161,7 @@ def run_compliance_query(query: str, chat_history: list = None) -> dict:
         except Exception as e:
             print(f"Error querying latam_compliance: {e}")
             results = []
-            
+
     elif intent == "HR":
         collection_name = KNOWLEDGE_BASES["HR"]
         try:
@@ -189,30 +190,33 @@ def run_compliance_query(query: str, chat_history: list = None) -> dict:
                 content = msg.get("content", "")
                 prompt += f"- {role}: {content}\n"
             prompt += "====================================================\n\n"
-            
+
         prompt += f"USER QUESTION: {query}\n\n"
         prompt += (
             "Instructions:\n"
             "You are a professional assistant. Provide a helpful, clear, and accurate response "
             "to the user's question. If they are greeting you or doing small talk, respond warmly and professionally."
         )
-        
+
         # Fast direct LLM invocation with retry and fallback
         def call_direct():
             return gemini_llm.call(prompt)
-            
+
         try:
             answer = execute_with_retry_and_fallback(call_direct)
         except Exception as e:
-            print(f"[WARNING] General LLM call failed with primary model: {e}. Trying fallback model gemini-1.5-flash...")
+            print(
+                f"[WARNING] General LLM call failed with primary model: {e}. Trying fallback model gemini-1.5-flash...")
+
             def call_direct_fallback():
                 return gemini_fallback_llm.call(prompt)
             try:
                 answer = execute_with_retry_and_fallback(call_direct_fallback)
             except Exception as final_err:
-                print(f"[ERROR] General LLM fallback call also failed: {final_err}")
+                print(
+                    f"[ERROR] General LLM fallback call also failed: {final_err}")
                 raise final_err
-        
+
         return {
             "answer": str(answer),
             "intent": intent,
@@ -222,7 +226,7 @@ def run_compliance_query(query: str, chat_history: list = None) -> dict:
 
     # 5. CONTEXT PREPARATION
     context = build_context(results)
-    
+
     # Extract unique source files used
     documents_used = list(set(
         item["metadata"].get("source_file", "latam_laws_flat.json")
@@ -349,7 +353,8 @@ A professional HR response including:
     try:
         result = execute_with_retry_and_fallback(kickoff_crew)
     except Exception as e:
-        print(f"[WARNING] Crew execution failed with primary model: {e}. Trying fallback model gemini-1.5-flash...")
+        print(
+            f"[WARNING] Crew execution failed with primary model: {e}. Trying fallback model gemini-1.5-flash...")
         try:
             compliance_agent.llm = gemini_fallback_llm
             # Recreate task and crew to ensure settings are correctly propagated
@@ -364,17 +369,20 @@ A professional HR response including:
                 process=Process.sequential,
                 verbose=True
             )
+
             def kickoff_fallback_crew():
                 return fallback_crew.kickoff()
             result = execute_with_retry_and_fallback(kickoff_fallback_crew)
         except Exception as fallback_err:
-            print(f"[ERROR] Fallback model Crew execution failed: {fallback_err}. Falling back to direct LLM call...")
+            print(
+                f"[ERROR] Fallback model Crew execution failed: {fallback_err}. Falling back to direct LLM call...")
             try:
-                result = execute_with_retry_and_fallback(lambda: gemini_fallback_llm.call(description))
+                result = execute_with_retry_and_fallback(
+                    lambda: gemini_fallback_llm.call(description))
             except Exception as final_err:
                 print(f"[ERROR] All models and approaches failed: {final_err}")
                 raise final_err
-    
+
     return {
         "answer": str(result),
         "intent": intent,

@@ -1,3 +1,6 @@
+from routes.chat import router as chat_router
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI
 import sys
 from pathlib import Path
 
@@ -6,9 +9,6 @@ backend_root = Path(__file__).resolve().parent
 if str(backend_root) not in sys.path:
     sys.path.append(str(backend_root))
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from backend.routes.chat import router as chat_router
 
 app = FastAPI(
     title="LATAM Compliance Agent API",
@@ -32,6 +32,8 @@ app.add_middleware(
 )
 
 # Health Check Route
+
+
 @app.get("/health")
 async def health_check():
     """

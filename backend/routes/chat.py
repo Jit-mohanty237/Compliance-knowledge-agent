@@ -1,9 +1,10 @@
 # pyrefly: ignore [missing-import]
 from fastapi import APIRouter, HTTPException
-from backend.schemas.chat import ChatRequest, ChatResponse
-from backend.services.compliance import process_compliance_chat
+from schemas.chat import ChatRequest, ChatResponse
+from services.compliance import process_compliance_chat
 
 router = APIRouter(tags=["chat"])
+
 
 @router.post("/chat", response_model=ChatResponse)
 def chat_endpoint(payload: ChatRequest):
