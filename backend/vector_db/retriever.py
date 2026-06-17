@@ -10,9 +10,6 @@ from pathlib import Path
 
 CHROMA_PATH = Path(__file__).resolve().parent / "chroma_db"
 
-client = chromadb.PersistentClient(
-    path=str(CHROMA_PATH)
-)
 COLLECTION_NAME = "latam_compliance"
 
 # Configurable mapping of intents to knowledge bases
@@ -21,14 +18,26 @@ KNOWLEDGE_BASES = {
     "HR": "hr_playbook"
 }
 
-# Same embedding model used during ingestion (loaded lazily)
+_client = None
 _embedding_fn = None
 _compliance_collection = None
 _hr_collection = None
 
+def get_chroma_client():
+    """
+    Lazy-load the Chroma PersistentClient exactly once.
+    """
+    global _client
+    if _client is None:
+        print("[DEBUG] Initializing Chroma PersistentClient (should happen once only)")
+        _client = chromadb.PersistentClient(
+            path=str(CHROMA_PATH)
+        )
+    return _client
+
 def get_embedding_fn():
     """
-    Lazy-load the SentenceTransformer embedding function.
+    Lazy-load the SentenceTransformer embedding function exactly once.
     """
     global _embedding_fn
     if _embedding_fn is None:
@@ -40,12 +49,12 @@ def get_embedding_fn():
 
 def get_compliance_collection():
     """
-    Lazy-load the compliance collection.
+    Lazy-load the compliance collection exactly once.
     """
     global _compliance_collection
     if _compliance_collection is None:
         print("[DEBUG] Loading Compliance Collection from ChromaDB (should happen once only)")
-        _compliance_collection = client.get_or_create_collection(
+        _compliance_collection = get_chroma_client().get_or_create_collection(
             name=COLLECTION_NAME,
             embedding_function=get_embedding_fn()
         )
@@ -53,16 +62,46 @@ def get_compliance_collection():
 
 def get_hr_collection():
     """
-    Lazy-load the HR collection.
+    Lazy-load the HR collection exactly once.
     """
     global _hr_collection
     if _hr_collection is None:
         print("[DEBUG] Loading HR Collection from ChromaDB (should happen once only)")
-        _hr_collection = client.get_or_create_collection(
+        _hr_collection = get_chroma_client().get_or_create_collection(
             name=KNOWLEDGE_BASES["HR"],
             embedding_function=get_embedding_fn()
         )
     return _hr_collection
+
+import time
+
+def init_chroma():
+    """
+    Eagerly pre-load and initialize the Chroma client, the embedding function, and both collections.
+    This should be called at startup to prevent latency on first query.
+    """
+    print("[DEBUG] Eagerly pre-initializing ChromaDB components on startup...")
+    t_start = time.time()
+    
+    t_client_start = time.time()
+    get_chroma_client()
+    t_client = time.time() - t_client_start
+    print(f"[DEBUG] Chroma client pre-initialized in {t_client:.4f}s")
+    
+    t_embed_start = time.time()
+    get_embedding_fn()
+    t_embed = time.time() - t_embed_start
+    print(f"[DEBUG] Embedding function pre-initialized in {t_embed:.4f}s")
+    
+    t_coll_start = time.time()
+    get_compliance_collection()
+    get_hr_collection()
+    t_coll = time.time() - t_coll_start
+    print(f"[DEBUG] Collections pre-loaded in {t_coll:.4f}s")
+    
+    t_total = time.time() - t_start
+    print(f"[DEBUG] Pre-initialization completed in {t_total:.4f}s")
+
 
 
 

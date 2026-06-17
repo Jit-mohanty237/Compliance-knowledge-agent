@@ -119,6 +119,18 @@ def get_compliance_agent():
         )
     return _compliance_agent
 
+def init_agents():
+    """
+    Eagerly pre-load and initialize LLMs and Agents on startup.
+    This should be called at startup to prevent latency on first query.
+    """
+    print("[DEBUG] Eagerly pre-initializing CrewAI LLMs and Agents on startup...")
+    t_start = time.time()
+    get_gemini_llm()
+    get_gemini_fallback_llm()
+    get_compliance_agent()
+    print(f"[DEBUG] CrewAI LLMs and Agents pre-initialized in {time.time() - t_start:.4f}s")
+
 
 def is_rate_limit_error(e: Exception) -> bool:
     err_msg = str(e)
@@ -173,8 +185,11 @@ def run_compliance_query(query: str, chat_history: list = None) -> dict:
         3. If no documents match, or intent is GENERAL, falls back to direct Gemini LLM.
         4. Otherwise, runs the CrewAI Agent context-matching task.
         5. Returns structured dictionary containing response + metadata.
-    """
+        """
     request_start = time.time()
+
+    # Log that Chroma initialization is done at startup (zero request overhead)
+    print("[TIME] Chroma Initialization: Done at startup (0.0000s request overhead)")
 
     # 1. INTENT CLASSIFICATION
     t0 = time.time()
@@ -204,6 +219,7 @@ def run_compliance_query(query: str, chat_history: list = None) -> dict:
             results = []
     
     t_retrieved = time.time() - t_retrieve_start
+    print(f"[TIME] Chroma Query: {t_retrieved:.4f}s")
     print(f"[TIME] Collection Selection: {collection_name}")
     print(f"[TIME] Retrieval Completed: {len(results)} chunks ({t_retrieved:.4f}s)")
 
@@ -288,9 +304,9 @@ def run_compliance_query(query: str, chat_history: list = None) -> dict:
                 raise final_err
 
         t_gemini = time.time() - t_gemini_start
-        print(f"[TIME] Gemini Completed: {t_gemini:.4f}s")
+        print(f"[TIME] Gemini Execution: {t_gemini:.4f}s")
         t_total = time.time() - request_start
-        print(f"[TIME] Total Request Time (Fallback): {t_total:.4f}s")
+        print(f"[TIME] Total Request Time: {t_total:.4f}s")
 
         return {
             "answer": str(answer),
@@ -313,8 +329,12 @@ def run_compliance_query(query: str, chat_history: list = None) -> dict:
     if BYPASS_CREWAI_DEBUG:
         t_total = time.time() - request_start
         print(f"[TIME] Total Request Time (Bypassed CrewAI): {t_total:.4f}s")
+        retrieved_content = "\n\n".join([
+            f"--- Chunk #{i+1} (Source: {r['metadata'].get('source_file', 'unknown') if r.get('metadata') else 'unknown'}) ---\n{r['document']}"
+            for i, r in enumerate(results)
+        ])
         return {
-            "answer": f"[DEBUG] BYPASS_CREWAI_DEBUG is active. Retrieved {len(results)} chunks from {collection_name}. First chunk metadata: {results[0].get('metadata') if results else None}",
+            "answer": f"[DEBUG] BYPASS_CREWAI_DEBUG is active. Retrieved {len(results)} chunks from {collection_name}.\n\n{retrieved_content}",
             "intent": intent,
             "source_collection": collection_name,
             "documents_used": documents_used
@@ -494,7 +514,7 @@ A professional HR response including:
                 print(f"[ERROR] All models and approaches failed: {final_err}")
                 raise final_err
     t_crew = time.time() - t_crew_start
-    print(f"[TIME] CrewAI Completed: {t_crew:.4f}s")
+    print(f"[TIME] CrewAI Execution: {t_crew:.4f}s")
     t_total = time.time() - request_start
     print(f"[TIME] Total Request Time: {t_total:.4f}s")
 

@@ -9,12 +9,23 @@ if str(backend_root) not in sys.path:
 from routes.chat import router as chat_router
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
+from contextlib import asynccontextmanager
+from vector_db.retriever import init_chroma
+from compliance_agent import init_agents
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Eagerly pre-initialize Chroma client, embedding function, and collections on startup
+    init_chroma()
+    # Eagerly pre-initialize LLMs and agents on startup
+    init_agents()
+    yield
 
 app = FastAPI(
     title="LATAM Compliance Agent API",
     description="API server providing RAG-augmented compliance query processing for Latin America.",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # CORS configuration - allow React dev server origins
