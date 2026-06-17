@@ -2,6 +2,8 @@
 from fastapi import APIRouter, HTTPException
 from schemas.chat import ChatRequest, ChatResponse
 from services.compliance import process_compliance_chat
+from compliance_agent import get_gemini_llm
+import time
 
 router = APIRouter(tags=["chat"])
 
@@ -29,4 +31,23 @@ def chat_endpoint(payload: ChatRequest):
         raise HTTPException(
             status_code=500,
             detail=f"An error occurred while generating compliance guidance: {str(e)}"
+        )
+
+
+@router.post("/test-gemini")
+def test_gemini_endpoint(payload: ChatRequest):
+    """
+    Directly invokes the Gemini LLM to test API latency.
+    """
+    try:
+        t0 = time.time()
+        llm = get_gemini_llm()
+        response = llm.call(payload.message)
+        latency = time.time() - t0
+        print(f"[TIME] Direct Gemini call took {latency:.4f}s")
+        return {"response": str(response)}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error in direct Gemini call: {str(e)}"
         )

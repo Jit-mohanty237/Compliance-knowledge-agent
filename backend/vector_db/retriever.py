@@ -32,6 +32,7 @@ def get_embedding_fn():
     """
     global _embedding_fn
     if _embedding_fn is None:
+        print("[DEBUG] Initializing SentenceTransformerEmbeddingFunction (should happen once only)")
         _embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
             model_name="all-MiniLM-L6-v2"
         )
@@ -43,6 +44,7 @@ def get_compliance_collection():
     """
     global _compliance_collection
     if _compliance_collection is None:
+        print("[DEBUG] Loading Compliance Collection from ChromaDB (should happen once only)")
         _compliance_collection = client.get_or_create_collection(
             name=COLLECTION_NAME,
             embedding_function=get_embedding_fn()
@@ -55,6 +57,7 @@ def get_hr_collection():
     """
     global _hr_collection
     if _hr_collection is None:
+        print("[DEBUG] Loading HR Collection from ChromaDB (should happen once only)")
         _hr_collection = client.get_or_create_collection(
             name=KNOWLEDGE_BASES["HR"],
             embedding_function=get_embedding_fn()
