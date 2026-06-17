@@ -43,6 +43,11 @@ gemini_llm = LLM(
     api_key=GEMINI_API_KEY
 )
 
+gemini_fallback_llm = LLM(
+    model="gemini/gemini-1.5-flash",
+    api_key=GEMINI_API_KEY
+)
+
 def execute_with_retry_and_fallback(fn, max_retries=3):
     """
     Executes a model function (crew.kickoff or llm.call) with retries 
@@ -196,7 +201,17 @@ def run_compliance_query(query: str, chat_history: list = None) -> dict:
         def call_direct():
             return gemini_llm.call(prompt)
             
-        answer = execute_with_retry_and_fallback(call_direct)
+        try:
+            answer = execute_with_retry_and_fallback(call_direct)
+        except Exception as e:
+            print(f"[WARNING] General LLM call failed with primary model: {e}. Trying fallback model gemini-1.5-flash...")
+            def call_direct_fallback():
+                return gemini_fallback_llm.call(prompt)
+            try:
+                answer = execute_with_retry_and_fallback(call_direct_fallback)
+            except Exception as final_err:
+                print(f"[ERROR] General LLM fallback call also failed: {final_err}")
+                raise final_err
         
         return {
             "answer": str(answer),
@@ -317,6 +332,9 @@ A professional HR response including:
         agent=compliance_agent
     )
 
+    # Reset agent LLM to primary just in case it was changed to fallback in a previous execution
+    compliance_agent.llm = gemini_llm
+
     # 8. CREW EXECUTION
     crew = Crew(
         agents=[compliance_agent],
@@ -328,7 +346,34 @@ A professional HR response including:
     def kickoff_crew():
         return crew.kickoff()
 
-    result = execute_with_retry_and_fallback(kickoff_crew)
+    try:
+        result = execute_with_retry_and_fallback(kickoff_crew)
+    except Exception as e:
+        print(f"[WARNING] Crew execution failed with primary model: {e}. Trying fallback model gemini-1.5-flash...")
+        try:
+            compliance_agent.llm = gemini_fallback_llm
+            # Recreate task and crew to ensure settings are correctly propagated
+            fallback_task = Task(
+                description=description,
+                expected_output=expected_output,
+                agent=compliance_agent
+            )
+            fallback_crew = Crew(
+                agents=[compliance_agent],
+                tasks=[fallback_task],
+                process=Process.sequential,
+                verbose=True
+            )
+            def kickoff_fallback_crew():
+                return fallback_crew.kickoff()
+            result = execute_with_retry_and_fallback(kickoff_fallback_crew)
+        except Exception as fallback_err:
+            print(f"[ERROR] Fallback model Crew execution failed: {fallback_err}. Falling back to direct LLM call...")
+            try:
+                result = execute_with_retry_and_fallback(lambda: gemini_fallback_llm.call(description))
+            except Exception as final_err:
+                print(f"[ERROR] All models and approaches failed: {final_err}")
+                raise final_err
     
     return {
         "answer": str(result),
