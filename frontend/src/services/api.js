@@ -1,5 +1,10 @@
-// Configured backend API base URL
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+// Configured backend API URL
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+// Temporary diagnostic log for Vercel production check
+console.log("API URL:", import.meta.env.VITE_API_URL);
+
+const API_BASE_URL = `${API_URL}/api`;
 
 /**
  * Sends a message to the FastAPI compliance agent backend.
