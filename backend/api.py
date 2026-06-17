@@ -1,6 +1,3 @@
-from routes.chat import router as chat_router
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI
 import sys
 from pathlib import Path
 
@@ -8,6 +5,10 @@ from pathlib import Path
 backend_root = Path(__file__).resolve().parent
 if str(backend_root) not in sys.path:
     sys.path.append(str(backend_root))
+
+from routes.chat import router as chat_router
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI
 
 
 app = FastAPI(

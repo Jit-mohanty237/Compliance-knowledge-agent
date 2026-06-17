@@ -21,30 +21,45 @@ KNOWLEDGE_BASES = {
     "HR": "hr_playbook"
 }
 
-# Same embedding model used during ingestion
-embedding_fn = (
-    embedding_functions.SentenceTransformerEmbeddingFunction(
-        model_name="all-MiniLM-L6-v2"
-    )
-)
+# Same embedding model used during ingestion (loaded lazily)
+_embedding_fn = None
+_compliance_collection = None
+_hr_collection = None
 
-# ==========================================================
-# CONNECT TO EXISTING CHROMA DB
-# ==========================================================
+def get_embedding_fn():
+    """
+    Lazy-load the SentenceTransformer embedding function.
+    """
+    global _embedding_fn
+    if _embedding_fn is None:
+        _embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
+            model_name="all-MiniLM-L6-v2"
+        )
+    return _embedding_fn
 
-# Initialize both collections safely (creates them if they don't exist yet)
-compliance_collection = client.get_or_create_collection(
-    name=COLLECTION_NAME,
-    embedding_function=embedding_fn
-)
+def get_compliance_collection():
+    """
+    Lazy-load the compliance collection.
+    """
+    global _compliance_collection
+    if _compliance_collection is None:
+        _compliance_collection = client.get_or_create_collection(
+            name=COLLECTION_NAME,
+            embedding_function=get_embedding_fn()
+        )
+    return _compliance_collection
 
-hr_collection = client.get_or_create_collection(
-    name=KNOWLEDGE_BASES["HR"],
-    embedding_function=embedding_fn
-)
-
-# Retain 'collection' mapping for backward compatibility
-collection = compliance_collection
+def get_hr_collection():
+    """
+    Lazy-load the HR collection.
+    """
+    global _hr_collection
+    if _hr_collection is None:
+        _hr_collection = client.get_or_create_collection(
+            name=KNOWLEDGE_BASES["HR"],
+            embedding_function=get_embedding_fn()
+        )
+    return _hr_collection
 
 
 
@@ -89,7 +104,7 @@ def search(
     top_k: int = 5
 ):
 
-    results = collection.query(
+    results = get_compliance_collection().query(
         query_texts=[query],
         n_results=top_k
     )
@@ -107,7 +122,7 @@ def search_country(
     top_k: int = 5
 ):
 
-    results = collection.query(
+    results = get_compliance_collection().query(
         query_texts=[query],
         n_results=top_k,
         where={
@@ -129,7 +144,7 @@ def search_country_compliance(
     top_k: int = 10
 ):
 
-    results = collection.query(
+    results = get_compliance_collection().query(
         query_texts=[query],
         n_results=top_k,
         where={
@@ -157,7 +172,7 @@ def search_law(
     top_k: int = 10
 ):
 
-    results = collection.query(
+    results = get_compliance_collection().query(
         query_texts=[query],
         n_results=top_k,
         where={
@@ -198,7 +213,7 @@ def search_compliance(
     """
     Search only the compliance knowledge base (latam_compliance).
     """
-    results = compliance_collection.query(
+    results = get_compliance_collection().query(
         query_texts=[query],
         n_results=top_k
     )
@@ -212,7 +227,7 @@ def search_hr(
     """
     Search only the HR knowledge base (hr_playbook).
     """
-    results = hr_collection.query(
+    results = get_hr_collection().query(
         query_texts=[query],
         n_results=top_k
     )
@@ -229,7 +244,7 @@ def search_by_collection(
     """
     col = client.get_collection(
         name=collection_name,
-        embedding_function=embedding_fn
+        embedding_function=get_embedding_fn()
     )
     results = col.query(
         query_texts=[query],
