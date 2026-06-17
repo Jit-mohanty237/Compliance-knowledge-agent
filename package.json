@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "description": "LATAM Compliance Agent Workspace",
   "scripts": {
-    "backend": "venv/bin/python -m uvicorn backend.api:app --host localhost --port 8000 --reload",
+    "backend": "uvicorn backend.api:app --host 0.0.0.0 --port 8000 --reload",
     "frontend": "npm run dev --prefix frontend",
-    "start": "npm run backend"
+    "start": "uvicorn backend.api:app --host 0.0.0.0 --port $PORT"
   }
 }
