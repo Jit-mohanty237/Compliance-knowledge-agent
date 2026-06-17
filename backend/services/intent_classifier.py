@@ -28,11 +28,20 @@ class IntentClassifier:
     @staticmethod
     def classify(query: str) -> str:
         if not query:
+            print("[DEBUG] Empty query. Fallback path: GENERAL")
+            print("[DEBUG] Matched Intent: GENERAL")
             return "GENERAL"
             
         # Normalize: convert to lowercase and strip whitespace
         normalized_query = query.lower().strip()
         
+        # Word list for COMPLIANCE queries (checked first to prioritize country-specific laws)
+        compliance_keywords = [
+            "brazil", "argentina", "chile", "mexico", "peru", "colombia", "latam", 
+            "employment law", "compliance", "regulation", "legal requirement", "eor", 
+            "payroll compliance", "termination laws", "labor laws", "labor law", "laws", "law"
+        ]
+
         # Word list for HR queries
         hr_keywords = [
             "leave", "vacation", "employee", "employee lifecycle", "onboarding", 
@@ -40,22 +49,21 @@ class IntentClassifier:
             "probation", "performance review", "promotion", "manager", "hr policy"
         ]
         
-        # Word list for COMPLIANCE queries
-        compliance_keywords = [
-            "brazil", "argentina", "chile", "mexico", "peru", "colombia", "latam", 
-            "employment law", "compliance", "regulation", "legal requirement", "eor", 
-            "payroll compliance"
-        ]
-        
+        # Check for COMPLIANCE matches first
+        for keyword in compliance_keywords:
+            if keyword in normalized_query:
+                print(f"[DEBUG] Compliance keyword matched: {keyword}")
+                print(f"[DEBUG] Matched Intent: COMPLIANCE")
+                return "COMPLIANCE"
+                
         # Check for HR matches
         for keyword in hr_keywords:
             if keyword in normalized_query:
+                print(f"[DEBUG] HR keyword matched: {keyword}")
+                print(f"[DEBUG] Matched Intent: HR")
                 return "HR"
                 
-        # Check for COMPLIANCE matches
-        for keyword in compliance_keywords:
-            if keyword in normalized_query:
-                return "COMPLIANCE"
-                
         # Fallback to GENERAL
+        print(f"[DEBUG] No keywords matched. Fallback path: GENERAL")
+        print(f"[DEBUG] Matched Intent: GENERAL")
         return "GENERAL"

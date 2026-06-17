@@ -47,3 +47,9 @@ async def health_check():
 
 # Include chat router
 app.include_router(chat_router, prefix="/api")
+
+# Startup diagnostics
+print("[DEBUG] Loaded IntentClassifier")
+print("[DEBUG] Loaded Knowledge Bases")
+print("[DEBUG] COMPLIANCE Collection: latam_compliance")
+print("[DEBUG] HR Collection: hr_playbook")

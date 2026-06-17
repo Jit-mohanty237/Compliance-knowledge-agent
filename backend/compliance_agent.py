@@ -159,7 +159,7 @@ def run_compliance_query(query: str, chat_history: list = None) -> dict:
         try:
             results = search_compliance(query, top_k=10)
         except Exception as e:
-            print(f"Error querying latam_compliance: {e}")
+            print(f"[DEBUG] Collection selection failure / Query error for compliance: {e}")
             results = []
 
     elif intent == "HR":
@@ -167,20 +167,34 @@ def run_compliance_query(query: str, chat_history: list = None) -> dict:
         try:
             results = search_hr(query, top_k=10)
         except Exception as e:
-            print(f"Error querying hr_playbook: {e}")
+            print(f"[DEBUG] Collection selection failure / Query error for HR: {e}")
             results = []
 
-    # 3. TASK LOGGING (Required format)
+    # 3. TASK LOGGING (Required format & Detailed debug logging)
+    print(f"[DEBUG] Incoming Query: {query}")
+    print(f"[DEBUG] Classified Intent: {intent}")
+    print(f"[DEBUG] Selected Collection: {collection_name}")
+    print(f"[DEBUG] Retrieved Chunks: {len(results)}")
+
     print(f"[INFO] Intent: {intent}")
     print(f"[INFO] Collection: {collection_name}")
     print(f"[INFO] Retrieved Chunks: {len(results)}")
 
-    # 4. FALLBACK LOGIC
+    # 4. FALLBACK LOGIC AUDIT & EXPLICIT LOGGING
     fallback_triggered = False
-    if intent == "GENERAL" or not results:
+    fallback_reason = ""
+    
+    if intent == "GENERAL":
         fallback_triggered = True
-
+        fallback_reason = "Intent classification failure (fell back to GENERAL)"
+        print(f"[DEBUG] Intent classification failure: fallback to GENERAL")
+    elif not results:
+        fallback_triggered = True
+        fallback_reason = "Chroma retrieval returning zero results"
+        print(f"[DEBUG] Chroma retrieval returning zero results for collection: {collection_name}")
+    
     if fallback_triggered:
+        print(f"[DEBUG] LLM fallback activation (Reason: {fallback_reason})")
         # Build direct LLM prompt (incorporating memory if available)
         prompt = ""
         if chat_history:
