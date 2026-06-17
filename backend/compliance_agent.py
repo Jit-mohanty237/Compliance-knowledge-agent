@@ -44,7 +44,7 @@ gemini_llm = LLM(
 )
 
 gemini_fallback_llm = LLM(
-    model="gemini/gemini-1.5-flash",
+    model="gemini/gemini-2.5-flash",
     api_key=GEMINI_API_KEY
 )
 
