@@ -41,10 +41,8 @@ def get_embedding_fn():
     """
     global _embedding_fn
     if _embedding_fn is None:
-        print("[DEBUG] Initializing SentenceTransformerEmbeddingFunction (should happen once only)")
-        _embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name="all-MiniLM-L6-v2"
-        )
+        print("[DEBUG] Initializing DefaultEmbeddingFunction (ONNX) to save memory")
+        _embedding_fn = embedding_functions.DefaultEmbeddingFunction()
     return _embedding_fn
 
 def get_compliance_collection():
